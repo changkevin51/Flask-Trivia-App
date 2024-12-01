@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="card">
+        <div class="card-header text-center">
+            <h2>Question {{ session.current_question + 1 }}</h2>
+        </div>
+        <div class="card-body">
+            <h4 class="card-title">{{ question }}</h4>
+            <form method="POST" class="mb-3">
+                {{ form.hidden_tag() }}
+                <div class="form-group">
+                    {% for opt, label in form.option.choices %}
+                        <div class="form-check">
+                            <input
+                                type="radio"
+                                id="option-{{ opt }}"
+                                name="option"
+                                value="{{ opt }}"
+                                class="form-check-input"
+                                {% if form.option.data == opt %} checked {% endif %}
+                                {% if show_feedback %} disabled {% endif %}
+                            >
+                            <label for="option-{{ opt }}" class="form-check-label">{{ label }}</label>
+                        </div>
+                    {% endfor %}
+                </div>
+                <div class="d-grid gap-2">
+                    {% if not show_feedback %}
+                        <button type="submit" name="submit_answer" class="btn btn-success btn-lg mt-3">Submit Answer</button>
+                    {% else %}
+                        <div class="alert {% if form.option.data == correct_answer %}alert-success{% else %}alert-danger{% endif %} mt-3">
+                            {% if form.option.data == correct_answer %}
+                                <strong>Correct!</strong>
+                            {% else %}
+                                <strong>Wrong!</strong> The correct answer was: <strong>{{ correct_answer }}</strong>
+                            {% endif %}
+                        </div>
+                        <button type="submit" name="next_question" class="btn btn-primary btn-lg mt-3">Next Question</button>
+                    {% endif %}
+                </div>
+            </form>
+            <form method="POST">
+                {{ form.hidden_tag() }}
+                <button type="submit" name="skip_question" class="btn btn-outline-warning">Skip Question</button>
+                <br> <br> 
+                <button type="submit" name="end_quiz" class="btn btn-danger btn-lg">End Quiz</button>
+            </form>
+            <p class="mt-3">Current Score: <strong>{{ score }}</strong></p>
+        </div>
+    </div>
+</div>
+
+<link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.1.1/css/bootstrap.min.css">
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/2.1.1/jquery.min.js"></script>
+<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.1.1/js/bootstrap.bundle.min.js"></script>
+{% endblock %}

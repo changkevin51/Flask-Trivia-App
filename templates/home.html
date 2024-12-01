@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<div class="container mt-5">
+    <div class="text-center">
+        <h1 class="display-4">Welcome to the Trivia App</h1>
+        <p class="lead">Select your preferences to get started!</p>
+        <img src="{{ url_for('static', filename='images/home.jpg') }}" alt="Home Image" class="img-fluid mb-4" style="width: 40%;">
+
+    </div>
+
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <form method="POST" class="needs-validation" novalidate>
+                {{ form.hidden_tag() }}
+
+                <div class="mb-4">
+                    {{ form.categories.label(class="form-label") }}
+                    <select id="categories" class="selectpicker form-control" multiple data-live-search="true" name="categories">
+                        <option value="select_all">Select All</option>
+                        {% for value, label in form.categories.choices %}
+                            <option value="{{ value }}">{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="mb-4">
+                    {{ form.difficulties.label(class="form-label") }}
+                    <select class="selectpicker form-control" multiple data-live-search="true" name="difficulties">
+                        {% for value, label in form.difficulties.choices %}
+                            <option value="{{ value }}">{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="d-grid gap-2">
+                    <button type="submit" class="btn btn-primary btn-lg">Start Trivia</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.1.1/css/bootstrap.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-select/1.13.1/css/bootstrap-select.min.css">
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/2.1.1/jquery.min.js"></script>
+<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.1.1/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-select/1.13.1/js/bootstrap-select.min.js"></script>
+<script>
+    $(document).ready(function() {
+        $('.selectpicker').selectpicker();
+
+        $('#categories').on('changed.bs.select', function (e, clickedIndex, isSelected, previousValue) {
+            if (clickedIndex === 0) {
+                if (isSelected) {
+                    $('#categories').selectpicker('selectAll');
+                } else {
+                    $('#categories').selectpicker('deselectAll');
+                }
+            }
+        });
+    });
+</script>
+{% endblock %}
