@@ -15,6 +15,16 @@
             <form method="POST" class="needs-validation" novalidate>
                 {{ form.hidden_tag() }}
 
+                <!-- Display Name Field -->
+                <div class="mb-4">
+                    <label for="display_name" class="form-label">Enter Your Display Name</label>
+                    <input type="text" id="display_name" name="display_name" class="form-control" placeholder="Your Name" required>
+                    <div class="invalid-feedback">
+                        Please enter your display name.
+                    </div>
+                </div>
+
+                <!-- Categories Field -->
                 <div class="mb-4">
                     {{ form.categories.label(class="form-label") }}
                     <select id="categories" class="selectpicker form-control" multiple data-live-search="true" name="categories">
@@ -25,6 +35,7 @@
                     </select>
                 </div>
 
+                <!-- Difficulties Field -->
                 <div class="mb-4">
                     {{ form.difficulties.label(class="form-label") }}
                     <select class="selectpicker form-control" multiple data-live-search="true" name="difficulties">
@@ -34,6 +45,7 @@
                     </select>
                 </div>
 
+                <!-- Submit Button -->
                 <div class="d-grid gap-2">
                     <button type="submit" class="btn btn-primary btn-lg">Start Trivia</button>
                 </div>

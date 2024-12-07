@@ -1,26 +1,53 @@
 from flask import Flask, render_template, redirect, url_for, session, request, flash
 from flask_wtf import FlaskForm
-from wtforms import SelectMultipleField, RadioField, SubmitField
+from wtforms import SelectMultipleField, RadioField, SubmitField, StringField
 from wtforms.validators import DataRequired
 import pandas as pd
 import secrets
-import random
+from flask_sqlalchemy import SQLAlchemy
 
 app = Flask(__name__)
 app.secret_key = secrets.token_hex(16)
+
+# Add database configuration
+app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///leaderboard.db"  # Use MySQL URI if needed
+app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+
+db = SQLAlchemy(app)
 
 df = pd.read_csv("questions.csv")
 df["options"] = df[["option1", "option2", "option3", "option4"]].values.tolist()
 
 class HomeForm(FlaskForm):
-    categories = SelectMultipleField("Select Categories", choices=[], validators=[DataRequired()])
-    difficulties = SelectMultipleField("Select Difficulties", choices=[], validators=[DataRequired()])
-    submit = SubmitField("Start Trivia")
+    display_name = StringField('Enter Your Display Name', validators=[DataRequired()])
+    categories = SelectMultipleField('Categories', coerce=str)
+    difficulties = SelectMultipleField('Difficulties', coerce=str)
+    submit = SubmitField('Start Trivia')
 
 class QuestionForm(FlaskForm):
     option = RadioField("Options", choices=[], validators=[DataRequired()])
     submit = SubmitField("Submit Answer")
     end_quiz = SubmitField("End Tivia")
+
+class LeaderboardEntry(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    player = db.Column(db.String(50), nullable=False)
+    score = db.Column(db.Integer, nullable=False)
+    percentage = db.Column(db.Float, nullable=False)
+    attempted = db.Column(db.Integer, nullable=False)
+
+    def __repr__(self):
+        return f"<LeaderboardEntry {self.player}, Score: {self.score}>"
+
+@app.route("/leaderboard")
+def leaderboard():
+    # Query the leaderboard entries sorted by score and percentage
+    leaderboard_entries = LeaderboardEntry.query.order_by(
+        LeaderboardEntry.score.desc(), LeaderboardEntry.percentage.desc()
+    ).all()
+
+    return render_template("leaderboard.html", leaderboard=leaderboard_entries)
+
 
 @app.route("/", methods=["GET", "POST"])
 def home():
@@ -31,21 +58,29 @@ def home():
     if request.method == "POST":
         selected_categories = request.form.getlist("categories")
         selected_difficulties = request.form.getlist("difficulties")
+        display_name = request.form.get("display_name")  # Get the display name from the form
+
+        if not display_name:
+            flash("Please enter your display name.")
+            return render_template("home.html", form=form)
 
         if not selected_categories or not selected_difficulties:
             flash("Please select at least one category and one difficulty.")
             return render_template("home.html", form=form)
 
+        # Save data to the session
         session["score"] = 0
         session["current_question"] = 0
         session["answers"] = []
         session["skipped_questions"] = 0
         session["selected_categories"] = selected_categories
         session["selected_difficulties"] = selected_difficulties
+        session["player_name"] = display_name  # Use "player_name" to be consistent with the database
 
         return redirect(url_for("question"))
 
     return render_template("home.html", form=form)
+
 
 @app.route("/question", methods=["GET", "POST"])
 def question():
@@ -111,9 +146,21 @@ def end_game():
     skipped_questions = session.get("skipped_questions", 0)
     percentage = (score / (total_questions_attempted - skipped_questions)) * 100 if total_questions_attempted > 0 else 0
 
+    # Save results to the database
+    player_name = session.get("player_name", "Anonymous")  # This will now correctly use the display name
+    new_entry = LeaderboardEntry(
+        player=player_name,
+        score=score,
+        percentage=round(percentage, 2),
+        attempted=total_questions_attempted - skipped_questions
+    )
+    db.session.add(new_entry)
+    db.session.commit()
+
     return render_template(
         "result.html", score=score, total=total_questions_attempted, skipped=skipped_questions, percentage=percentage
     )
 
+
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run()
