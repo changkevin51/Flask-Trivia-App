@@ -5,12 +5,12 @@ from wtforms.validators import DataRequired
 import pandas as pd
 import secrets
 from flask_sqlalchemy import SQLAlchemy
+import random
 
 app = Flask(__name__)
 app.secret_key = secrets.token_hex(16)
 
-# Add database configuration
-app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///leaderboard.db"  # Use MySQL URI if needed
+app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///leaderboard.db"
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
 db = SQLAlchemy(app)
@@ -26,8 +26,10 @@ class HomeForm(FlaskForm):
 
 class QuestionForm(FlaskForm):
     option = RadioField("Options", choices=[], validators=[DataRequired()])
-    submit = SubmitField("Submit Answer")
-    end_quiz = SubmitField("End Tivia")
+    submit_answer = SubmitField("Submit Answer")
+    skip_question = SubmitField("Skip Question")
+    end_quiz = SubmitField("End Trivia")
+    eliminate_options = SubmitField("Eliminate Two Wrong Answers")
 
 class LeaderboardEntry(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -41,13 +43,10 @@ class LeaderboardEntry(db.Model):
 
 @app.route("/leaderboard")
 def leaderboard():
-    # Query the leaderboard entries sorted by score and percentage
     leaderboard_entries = LeaderboardEntry.query.order_by(
         LeaderboardEntry.score.desc(), LeaderboardEntry.percentage.desc()
     ).all()
-
     return render_template("leaderboard.html", leaderboard=leaderboard_entries)
-
 
 @app.route("/", methods=["GET", "POST"])
 def home():
@@ -58,7 +57,7 @@ def home():
     if request.method == "POST":
         selected_categories = request.form.getlist("categories")
         selected_difficulties = request.form.getlist("difficulties")
-        display_name = request.form.get("display_name")  # Get the display name from the form
+        display_name = request.form.get("display_name")
 
         if not display_name:
             flash("Please enter your display name.")
@@ -68,19 +67,17 @@ def home():
             flash("Please select at least one category and one difficulty.")
             return render_template("home.html", form=form)
 
-        # Save data to the session
         session["score"] = 0
         session["current_question"] = 0
         session["answers"] = []
         session["skipped_questions"] = 0
         session["selected_categories"] = selected_categories
         session["selected_difficulties"] = selected_difficulties
-        session["player_name"] = display_name  # Use "player_name" to be consistent with the database
+        session["player_name"] = display_name
 
         return redirect(url_for("question"))
 
     return render_template("home.html", form=form)
-
 
 @app.route("/question", methods=["GET", "POST"])
 def question():
@@ -92,8 +89,12 @@ def question():
     if session["current_question"] >= len(filtered_questions):
         return redirect(url_for("end_game"))
 
+    if "eliminate_button_visible" not in session:
+        session["eliminate_button_visible"] = True
+
     question_data = filtered_questions.iloc[session["current_question"]].to_dict()
     session["current_question_data"] = question_data
+    session["used_eliminate"] = False
 
     form = QuestionForm()
 
@@ -105,38 +106,68 @@ def question():
     else:
         form.option.choices = [(opt, opt) for opt in question_data["options"]]
 
+    if len(form.option.choices) <= 2:
+        session["eliminate_button_visible"] = False
+
     show_feedback = False
 
     if request.method == "POST":
-        if "end_quiz" in request.form:
-            return redirect(url_for("end_game"))
+        action = request.form.get("action")
 
-        if "skip_question" in request.form:
-            session["skipped_questions"] += 1
-            session["current_question"] += 1
-            return redirect(url_for("question"))
-
-        if "submit_answer" in request.form:
+        if action == "submit_answer" and form.validate_on_submit():
             selected_option = form.option.data
             correct_answer = question_data["correct_answer"]
-
+            session["eliminate_button_visible"] = False
             session["answers"].append((question_data["question"], selected_option, correct_answer))
-            if selected_option == correct_answer:
-                session["score"] += 1
 
+            if selected_option == correct_answer:
+                if session["used_eliminate"]:
+                    session["score"] += 0.5
+                else:
+                    session["score"] += 1
             show_feedback = True
 
-        if "next_question" in request.form:
+        elif action == "eliminate_options" and session["eliminate_button_visible"]:
+            current_question_data = session["current_question_data"]
+            incorrect_options = [
+                opt for opt in current_question_data["options"]
+                if opt != current_question_data["correct_answer"] and pd.notna(opt)
+            ]
+            if len(incorrect_options) > 2:
+                options_to_remove = random.sample(incorrect_options, 2)
+                current_question_data["options"] = [
+                    opt for opt in current_question_data["options"]
+                    if opt not in options_to_remove
+                ]
+            session["current_question_data"] = current_question_data
+            session["used_eliminate"] = True
+            session.modified = True
+
+        elif action == "skip_question":
+            session["skipped_questions"] += 1
             session["current_question"] += 1
+            if session["current_question"] >= len(filtered_questions):
+                return redirect(url_for("end_game"))
+            return redirect(url_for("question"))
+
+        elif action == "end_quiz":
+            return redirect(url_for("end_game"))
+
+        elif action == "next_question":
+            session["current_question"] += 1
+            session["eliminate_button_visible"] = True
+            if session["current_question"] >= len(filtered_questions):
+                return redirect(url_for("end_game"))
             return redirect(url_for("question"))
 
     return render_template(
         "question.html",
         question=question_data["question"],
         form=form,
-        correct_answer=session.get("current_question_data", {}).get("correct_answer", None),
+        correct_answer=question_data["correct_answer"] if show_feedback else None,
         show_feedback=show_feedback,
-        score=session["score"]
+        score=session["score"],
+        eliminate_button_visible=session["eliminate_button_visible"]
     )
 
 @app.route("/end")
@@ -146,8 +177,7 @@ def end_game():
     skipped_questions = session.get("skipped_questions", 0)
     percentage = (score / (total_questions_attempted - skipped_questions)) * 100 if total_questions_attempted > 0 else 0
 
-    # Save results to the database
-    player_name = session.get("player_name", "Anonymous")  # This will now correctly use the display name
+    player_name = session.get("player_name", "Anonymous")
     new_entry = LeaderboardEntry(
         player=player_name,
         score=score,
@@ -161,6 +191,26 @@ def end_game():
         "result.html", score=score, total=total_questions_attempted, skipped=skipped_questions, percentage=percentage
     )
 
+@app.route('/eliminate_options', methods=['GET', 'POST'])
+def eliminate_options():
+    if not session.get('used_eliminate', False):
+        session['used_eliminate'] = True
+        session["eliminate_button_visible"] = False
+        current_question_data = session['current_question_data']
+
+        incorrect_options = [
+            opt for opt in current_question_data['options']
+            if opt != current_question_data['correct_answer']
+        ]
+        options_to_remove = random.sample(incorrect_options, 2)
+        current_question_data['options'] = [
+            opt for opt in current_question_data['options']
+            if opt not in options_to_remove
+        ]
+        session['current_question_data'] = current_question_data
+        session.modified = True
+
+    return redirect(url_for('question'))
 
 if __name__ == "__main__":
     app.run()
