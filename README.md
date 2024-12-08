@@ -10,6 +10,8 @@ Frontend: Bootstrap 4
 
 Backend: Flask (Python)
 
+Database: SQLAlchemy
+
 ## Installation
 To run this project, clone the repository. Make sure to install the required dependencies:
 
@@ -17,7 +19,7 @@ To run this project, clone the repository. Make sure to install the required dep
 pip install -r requirements.txt
 ```
 
-Then, run  ```main.py ``` 
+Then, run  ```app.py ``` 
 
 ## Features
 
