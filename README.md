@@ -27,7 +27,7 @@ Then, run  ```main.py ```
 - **Difficulties**: The questions are divided into 3 difficulties that the user can adjust.
 - **Statistics Tracking**: Continuously track your performance.
 - **Audio**: Background music can be played through the music toggle.
-- **NEW - Leaderboard**: Your score will be displayed on a global leaderboard.
-- **NEW - Remove 2 Wrong Answers**: Not really sure what's the right answer? No problem, improve your chances by only choosing between 2 choices instead of 4.
+- ***NEW - Leaderboard**: Your score will be displayed on a global leaderboard.
+- ***NEW - Remove 2 Wrong Answers**: Not really sure what's the right answer? No problem, improve your chances by only choosing between 2 choices instead of 4.
 
 
